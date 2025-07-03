@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import filedialog, ttk, messagebox
 from PIL import Image, ImageTk
 import os
+import glob
 from openpyxl import Workbook, load_workbook
 
 # Resample cho Pillow >=10
@@ -91,9 +92,6 @@ attribute_groups = {
         "Loại": ["không có", "đồng hồ đeo tay", "vòng tay", "vòng cổ", "vòng chân", "ví vuông", "ví da", "kính", "thẻ nhân viên", "khăn quàng cổ", "khẩu trang", "sách", "giấy"]
     }
 }
-
-# (Đầu đoạn mã giữ nguyên không đổi)
-# ... Các phần import, translation_dict, attribute_groups ...
 
 class LabelingTool:
     def __init__(self, root):
@@ -246,18 +244,13 @@ class LabelingTool:
                                    font=("Roboto", 14), bg="#4CAF50", fg="white")
         self.save_button.pack(pady=20)
 
-        # Load ảnh
+        # Lưu trữ label cho mỗi ảnh
+        self.image_labels = {}
+        
+        # Load ảnh từ cấu trúc thư mục phức tạp
         self.folder = filedialog.askdirectory(title="Chọn thư mục ảnh")
-        self.image_list = [f for f in os.listdir(self.folder) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+        self.load_images_from_subfolders()
         
-        # Sắp xếp ảnh theo thứ tự tự nhiên (số và chữ)
-        import re
-        def natural_sort_key(s):
-            return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', s)]
-        
-        self.image_list.sort(key=natural_sort_key)
-        self.image_index = 0
-
         self.excel_file = "labels.xlsx"
         if not os.path.exists(self.excel_file):
             wb = Workbook()
@@ -267,33 +260,103 @@ class LabelingTool:
 
         self.load_image()
 
-    def add_group_attributes(self, group_name):
-        """Add a complete set of attribute boxes for the specified group"""
-        # Get the attributes for this group
-        attributes = attribute_groups[group_name]
+    def load_images_from_subfolders(self):
+        """Tải danh sách ảnh từ tất cả các thư mục con"""
+        self.image_list = []
+        self.full_paths = []
         
-        # Create a new frame to hold the duplicated attributes horizontally
-        new_row_frame = tk.Frame(self.group_frames[group_name])
-        new_row_frame.pack(fill="x", pady=5)
+        # Tìm tất cả các thư mục con cấp 1
+        subfolders = [f for f in os.listdir(self.folder) if os.path.isdir(os.path.join(self.folder, f))]
         
-        # Add each attribute in the group
-        for attr, options in attributes.items():
-            # Create a frame for this attribute
-            attr_frame = tk.Frame(new_row_frame)
-            attr_frame.pack(side="left", padx=10)
+        # Sắp xếp thư mục theo thứ tự tự nhiên
+        import re
+        def natural_sort_key(s):
+            return [int(text) if text.isdigit() else text.lower() for text in re.split(r'(\d+)', s)]
+        
+        subfolders.sort(key=natural_sort_key)
+        
+        # Duyệt qua từng thư mục con và lấy danh sách ảnh
+        for subfolder in subfolders:
+            subfolder_path = os.path.join(self.folder, subfolder)
             
-            # Label với font Roboto
-            label = tk.Label(attr_frame, text=attr + ":", font=("Roboto", 16), anchor="w")
-            label.pack(anchor="w")
+            # Lấy tất cả ảnh từ thư mục con này
+            image_extensions = ['*.jpg', '*.jpeg', '*.png']
+            for ext in image_extensions:
+                image_paths = glob.glob(os.path.join(subfolder_path, ext))
+                
+                for img_path in image_paths:
+                    # Lưu đường dẫn đầy đủ đến ảnh
+                    self.full_paths.append(img_path)
+                    
+                    # Tạo tên hiển thị: "tên_folder - tên_ảnh"
+                    img_filename = os.path.basename(img_path)
+                    display_name = f"{subfolder} - {img_filename}"
+                    self.image_list.append(display_name)
+        
+        # Sắp xếp ảnh theo thứ tự tự nhiên
+        combined = list(zip(self.image_list, self.full_paths))
+        combined.sort(key=lambda x: natural_sort_key(x[0]))
+        
+        if combined:
+            self.image_list, self.full_paths = zip(*combined)
+            self.image_list = list(self.image_list)
+            self.full_paths = list(self.full_paths)
+        
+        self.image_index = 0
+    
+    def save_current_labels(self):
+        """Lưu lại trạng thái hiện tại của tất cả combobox"""
+        if not self.image_list:
+            return
             
-            # Combobox với font Roboto - cập nhật giá trị mặc định
-            cb = ttk.Combobox(attr_frame, values=options, state="readonly", font=("Roboto", 16), width=15)
-            cb.set(options[0])  # Thiết lập mặc định là lựa chọn đầu tiên
-            cb.pack()
+        current_image = self.image_list[self.image_index]
+        label_state = {}
+        
+        # Lưu trạng thái của tất cả combobox
+        for key, cb_list in self.comboboxes.items():
+            label_state[key] = [cb.get() for cb in cb_list]
             
-            # Add to our comboboxes dictionary
-            key = f"{group_name}:{attr}"
-            self.comboboxes.setdefault(key, []).append(cb)
+        # Lưu note
+        note_text = self.note_entry.get("1.0", "end").strip()
+        if note_text:
+            label_state["note"] = note_text
+            
+        # Lưu vào từ điển
+        self.image_labels[current_image] = label_state
+
+    def restore_labels(self):
+        """Khôi phục lại trạng thái đã lưu của các combobox"""
+        if not self.image_list:
+            return
+            
+        current_image = self.image_list[self.image_index]
+        
+        # Kiểm tra xem có dữ liệu đã lưu không
+        if current_image not in self.image_labels:
+            return
+            
+        label_state = self.image_labels[current_image]
+        
+        # Khôi phục trạng thái cho các combobox
+        for key, values in label_state.items():
+            if key == "note":
+                # Khôi phục note
+                self.note_entry.delete("1.0", "end")
+                self.note_entry.insert("1.0", values)
+            elif key in self.comboboxes:
+                # Khôi phục combobox
+                cb_list = self.comboboxes[key]
+                
+                # Thêm combobox mới nếu cần
+                while len(cb_list) < len(values):
+                    group, attr = key.split(':')
+                    self.add_group_attributes(group)
+                    cb_list = self.comboboxes[key]
+                
+                # Đặt giá trị
+                for i, value in enumerate(values):
+                    if i < len(cb_list):
+                        cb_list[i].set(value)
 
     def resize_image(self, image, max_w, max_h):
         w, h = image.size
@@ -301,7 +364,15 @@ class LabelingTool:
         return image.resize((int(w * scale), int(h * scale)), Image.Resampling.LANCZOS)
 
     def load_image(self):
-        img_path = os.path.join(self.folder, self.image_list[self.image_index])
+        if not self.image_list:
+            messagebox.showinfo("Thông báo", "Không tìm thấy ảnh nào trong thư mục.")
+            return
+            
+        # Lưu lại label của ảnh hiện tại trước khi chuyển sang ảnh khác
+        self.save_current_labels()
+        
+        # Tải ảnh mới
+        img_path = self.full_paths[self.image_index]
         image = Image.open(img_path)
         image = self.resize_image(image, 700, 700)
 
@@ -316,6 +387,9 @@ class LabelingTool:
         
         # Cập nhật tên ảnh hiển thị
         self.filename_label.config(text=f"Tên ảnh: {self.image_list[self.image_index]}")
+        
+        # Khôi phục lại label đã lưu (nếu có)
+        self.restore_labels()
 
     def get_labels(self):
         # Tạo từ điển để lưu các thuộc tính theo nhóm
@@ -460,19 +534,18 @@ class LabelingTool:
         description = self.get_labels()
         note_text = self.note_entry.get("1.0", "end").strip()
         filename = self.image_list[self.image_index]
+        
+        # Lưu lại label hiện tại vào bộ nhớ
+        self.save_current_labels()
 
         wb = load_workbook(self.excel_file)
         ws = wb.active
         ws.append([filename, description, note_text])
         wb.save(self.excel_file)
-
-        self.note_entry.delete("1.0", "end")
         
         # Thay đổi nút lưu để hiển thị dấu tích - giữ trạng thái này cho đến khi chuyển ảnh
         self.save_button.config(text="✓ Đã lưu")
         self.save_button.config(bg="#45a049")  # Làm xanh đậm nút khi lưu thành công
-        
-        # Không còn đặt hẹn giờ để đổi lại trạng thái nút
 
     def prev_image(self):
         if self.image_index > 0:
@@ -503,6 +576,9 @@ class LabelingTool:
             # Đổi trạng thái nút lưu về ban đầu khi tìm và chuyển ảnh
             self.save_button.config(text="Lưu nhãn", bg="#4CAF50")
             
+            # Lưu lại label của ảnh hiện tại trước khi chuyển sang ảnh khác
+            self.save_current_labels()
+            
             # Chọn ảnh đầu tiên phù hợp
             self.image_index = matching_images[0]
             self.load_image()
@@ -513,7 +589,7 @@ class LabelingTool:
                 tk.messagebox.showinfo("Kết quả tìm kiếm", message)
         else:
             tk.messagebox.showinfo("Không tìm thấy", f"Không tìm thấy ảnh nào khớp với '{search_term}'")
-    
+
     def _on_mousewheel(self, event):
         # Xác định hệ điều hành và xử lý sự kiện lăn chuột tương ứng
         if event.num == 4:  # Linux scroll up
