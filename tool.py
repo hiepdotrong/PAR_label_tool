@@ -217,7 +217,8 @@ class LabelingTool:
                     width=2,
                     font=larger_font
                 )
-                add_btn.pack(side="right", padx=10)
+                # Thay đổi từ side="right" thành side="left" và thêm padx sau group_label
+                add_btn.pack(side="left", padx=10)
 
             for attr, options in group_fields.items():
                 attr_frame = tk.Frame(group_frame)
@@ -226,7 +227,7 @@ class LabelingTool:
                 label = tk.Label(attr_frame, text=attr + ":", font=larger_font, width=20, anchor="w")
                 label.pack(side="left")
 
-                cb = ttk.Combobox(attr_frame, values=options, state="readonly", font=larger_font, width=30)
+                cb = ttk.Combobox(attr_frame, values=options, state="readonly", font=larger_font, width=20)  # Giảm từ 30 xuống 20
                 cb.set(options[0])  # Thiết lập mặc định là lựa chọn đầu tiên
                 cb.pack(side="left")
 
@@ -460,7 +461,7 @@ class LabelingTool:
             label = tk.Label(attr_frame, text=attr + ":", font=("Roboto", 16), width=20, anchor="w")
             label.pack(side="left")
 
-            cb = ttk.Combobox(attr_frame, values=options, state="readonly", font=("Roboto", 16), width=30)
+            cb = ttk.Combobox(attr_frame, values=options, state="readonly", font=("Roboto", 16), width=20)  # Giảm từ 30 xuống 20
             cb.set(options[0])  # Thiết lập mặc định là lựa chọn đầu tiên
             cb.pack(side="left")
 
@@ -756,7 +757,7 @@ class LabelingTool:
                         label = tk.Label(attr_frame, text=attr + ":", font=("Roboto", 16), width=20, anchor="w")
                         label.pack(side="left")
                         
-                        cb = ttk.Combobox(attr_frame, values=options, state="readonly", font=("Roboto", 16), width=30)
+                        cb = ttk.Combobox(attr_frame, values=options, state="readonly", font=("Roboto", 16), width=20)  # Giảm từ 30 xuống 20
                         cb.set(options[0])
                         cb.pack(side="left")
                         
