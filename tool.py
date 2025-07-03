@@ -227,7 +227,7 @@ class LabelingTool:
                 label.pack(side="left")
 
                 cb = ttk.Combobox(attr_frame, values=options, state="readonly", font=larger_font, width=30)
-                cb.set(options[0])  # Thiết lập mặc định là lựa chọn đầu tiên thay vì "không rõ"
+                cb.set(options[0])  # Thiết lập mặc định là lựa chọn đầu tiên
                 cb.pack(side="left")
 
                 key = f"{group_name}:{attr}"
@@ -258,7 +258,8 @@ class LabelingTool:
             ws.append(["Tên ảnh", "Miêu tả", "Lưu ý"])
             wb.save(self.excel_file)
 
-        self.load_image()
+        # Delay loading the first image until the UI is ready
+        self.root.after(100, self.load_image)
 
     def load_images_from_subfolders(self):
         """Tải danh sách ảnh từ tất cả các thư mục con"""
@@ -308,14 +309,25 @@ class LabelingTool:
         """Lưu lại trạng thái hiện tại của tất cả combobox"""
         if not self.image_list:
             return
-            
+        
         current_image = self.image_list[self.image_index]
         label_state = {}
         
         # Lưu trạng thái của tất cả combobox
         for key, cb_list in self.comboboxes.items():
-            label_state[key] = [cb.get() for cb in cb_list]
-            
+            # Lọc các combobox còn tồn tại và lấy giá trị
+            valid_values = []
+            for cb in cb_list:
+                try:
+                    if cb.winfo_exists():
+                        valid_values.append(cb.get())
+                except (tk.TclError, AttributeError):
+                    # Bỏ qua các widget không tồn tại
+                    continue
+                
+            if valid_values:  # Chỉ lưu nếu có giá trị hợp lệ
+                label_state[key] = valid_values
+        
         # Lưu note
         note_text = self.note_entry.get("1.0", "end").strip()
         if note_text:
@@ -344,19 +356,24 @@ class LabelingTool:
                 self.note_entry.delete("1.0", "end")
                 self.note_entry.insert("1.0", values)
             elif key in self.comboboxes:
-                # Khôi phục combobox
-                cb_list = self.comboboxes[key]
-                
-                # Thêm combobox mới nếu cần
-                while len(cb_list) < len(values):
-                    group, attr = key.split(':')
-                    self.add_group_attributes(group)
+                try:
+                    # Khôi phục combobox
                     cb_list = self.comboboxes[key]
-                
-                # Đặt giá trị
-                for i, value in enumerate(values):
-                    if i < len(cb_list):
-                        cb_list[i].set(value)
+                    
+                    # Thêm combobox mới nếu cần
+                    while len(cb_list) < len(values):
+                        group, attr = key.split(':')
+                        self.add_group_attributes(group)
+                        cb_list = self.comboboxes[key]
+                    
+                    # Đặt giá trị
+                    for i, value in enumerate(values):
+                        if i < len(cb_list) and cb_list[i].winfo_exists():
+                            cb_list[i].set(value)
+                except (tk.TclError, AttributeError) as e:
+                    # Bỏ qua lỗi nếu widget không tồn tại
+                    print(f"Không thể khôi phục {key}: {e}")
+                    continue
 
     def resize_image(self, image, max_w, max_h):
         w, h = image.size
@@ -370,6 +387,12 @@ class LabelingTool:
             
         # Lưu lại label của ảnh hiện tại trước khi chuyển sang ảnh khác
         self.save_current_labels()
+        
+        # Xóa tất cả các combobox phụ đã thêm vào trước khi load ảnh mới
+        self.reset_dynamic_fields()
+        
+        # Kiểm tra và sửa lỗi thiếu combobox
+        self.check_combobox_existence()
         
         # Tải ảnh mới
         img_path = self.full_paths[self.image_index]
@@ -390,6 +413,59 @@ class LabelingTool:
         
         # Khôi phục lại label đã lưu (nếu có)
         self.restore_labels()
+
+    def reset_dynamic_fields(self):
+        """Xóa tất cả các trường phụ đã thêm vào cho nhóm Túi và Khác"""
+        for group_name in ["Túi", "Khác"]:
+            if group_name in self.group_frames:
+                # 1. Lưu lại frame header (nút + và tên nhóm)
+                header_frame = None
+                for child in self.group_frames[group_name].winfo_children():
+                    if isinstance(child, tk.Frame) and len(child.winfo_children()) > 0:
+                        if isinstance(child.winfo_children()[0], tk.Label) and child.winfo_children()[0].cget("text") == group_name:
+                            header_frame = child
+                            break
+            
+                # 2. Xóa tất cả widget con trừ header
+                for child in list(self.group_frames[group_name].winfo_children()):
+                    if child != header_frame:
+                        child.destroy()
+            
+                # 3. Tạo lại frame cho các combobox đầu tiên
+                self._create_default_attributes(group_name)
+            
+                # 4. Reset dictionary comboboxes
+                for key in list(self.comboboxes.keys()):
+                    if key.startswith(f"{group_name}:"):
+                        attr = key.split(':')[1]
+                        # Tìm combobox mới tạo cho thuộc tính này
+                        for child in self.group_frames[group_name].winfo_children():
+                            if isinstance(child, tk.Frame):
+                                for widget in child.winfo_children():
+                                    if isinstance(widget, tk.Label) and widget.cget("text") == f"{attr}:":
+                                        # Tìm combobox bên cạnh label này
+                                        for w in child.winfo_children():
+                                            if isinstance(w, ttk.Combobox):
+                                                self.comboboxes[key] = [w]
+                                                break
+
+    def _create_default_attributes(self, group_name):
+        """Tạo lại các thuộc tính mặc định cho một nhóm"""
+        attributes = attribute_groups[group_name]
+        
+        for attr, options in attributes.items():
+            attr_frame = tk.Frame(self.group_frames[group_name])
+            attr_frame.pack(fill="x", pady=5)
+
+            label = tk.Label(attr_frame, text=attr + ":", font=("Roboto", 16), width=20, anchor="w")
+            label.pack(side="left")
+
+            cb = ttk.Combobox(attr_frame, values=options, state="readonly", font=("Roboto", 16), width=30)
+            cb.set(options[0])  # Thiết lập mặc định là lựa chọn đầu tiên
+            cb.pack(side="left")
+
+            key = f"{group_name}:{attr}"
+            self.comboboxes[key] = [cb]
 
     def get_labels(self):
         # Tạo từ điển để lưu các thuộc tính theo nhóm
@@ -422,47 +498,52 @@ class LabelingTool:
         bag_entries = []  # Lưu trữ các bộ [màu, loại] cho túi
         other_entries = []  # Lưu trữ các bộ [màu, loại] cho các vật dụng khác
         
-        # Chuẩn bị bộ lưu trữ hiện tại cho túi và vật dụng khác
-        current_bag = {"màu": None, "loại": None}
-        current_other = {"màu": None, "loại": None}
-        
         # Thu thập các giá trị từ combobox
         for key, cb_list in self.comboboxes.items():
             group, attr = key.split(':')
             
             for i, cb in enumerate(cb_list):
-                val = cb.get()
-                if val in ["không rõ", "không có"]:
-                    val_en = "unknown" if val == "không rõ" else "none"
-                else:
-                    val_en = translation_dict.get(val, val)
-                
-                # Xác định nhóm tiếng Anh tương ứng
-                eng_group = group_mapping[group][attr]
-                
-                # Xử lý đặc biệt cho túi và khác
-                if group == "Túi":
-                    # Túi thứ i
-                    if i >= len(bag_entries):
-                        bag_entries.append({"màu": None, "loại": None})
+                try:
+                    # Kiểm tra xem widget còn tồn tại không
+                    if not cb.winfo_exists():
+                        continue
+                        
+                    val = cb.get()
+                    if val in ["không rõ", "không có"]:
+                        val_en = "unknown" if val == "không rõ" else "none"
+                    else:
+                        val_en = translation_dict.get(val, val)
                     
-                    if attr == "Màu":
-                        bag_entries[i]["màu"] = val_en
-                    elif attr == "Loại":
-                        bag_entries[i]["loại"] = val_en
-                elif group == "Khác":
-                    # Vật dụng khác thứ i
-                    if i >= len(other_entries):
-                        other_entries.append({"màu": None, "loại": None})
+                    # Xác định nhóm tiếng Anh tương ứng
+                    eng_group = group_mapping[group][attr]
                     
-                    if attr == "Màu":
-                        other_entries[i]["màu"] = val_en
-                    elif attr == "Loại":
-                        other_entries[i]["loại"] = val_en
-                else:
-                    # Các nhóm còn lại xử lý bình thường
-                    grouped_attributes[eng_group].append(val_en)
-                
+                    # Xử lý đặc biệt cho túi và khác
+                    if group == "Túi":
+                        # Túi thứ i
+                        if i >= len(bag_entries):
+                            bag_entries.append({"màu": None, "loại": None})
+                        
+                        if attr == "Màu":
+                            bag_entries[i]["màu"] = val_en
+                        elif attr == "Loại":
+                            bag_entries[i]["loại"] = val_en
+                    elif group == "Khác":
+                        # Vật dụng khác thứ i
+                        if i >= len(other_entries):
+                            other_entries.append({"màu": None, "loại": None})
+                        
+                        if attr == "Màu":
+                            other_entries[i]["màu"] = val_en
+                        elif attr == "Loại":
+                            other_entries[i]["loại"] = val_en
+                    else:
+                        # Các nhóm còn lại xử lý bình thường
+                        grouped_attributes[eng_group].append(val_en)
+                except (tk.TclError, AttributeError) as e:
+                    # Bỏ qua lỗi nếu widget không tồn tại
+                    print(f"Lỗi khi lấy giá trị {key} thứ {i}: {e}")
+                    continue
+        
         # Tạo chuỗi kết quả theo định dạng yêu cầu
         result = []
         
@@ -479,10 +560,7 @@ class LabelingTool:
         # Xử lý các nhóm thông thường (không phải túi và khác)
         for group in ["hair", "hat", "shirt", "pants", "shoes"]:
             if grouped_attributes[group]:
-                # Loại bỏ các giá trị trùng lặp và 'none' nếu có các giá trị khác
                 values = list(dict.fromkeys(grouped_attributes[group]))
-                if len(values) > 1 and "none" in values:
-                    values.remove("none")
                 
                 # Nếu tất cả là 'none' hoặc 'unknown', chỉ giữ lại một giá trị
                 if all(v in ["none", "unknown"] for v in values) and len(values) > 1:
@@ -499,12 +577,12 @@ class LabelingTool:
             
             for entry in bag_entries:
                 values = []
-                if entry["màu"] not in [None, "none"]:
+                if entry["màu"]:
                     values.append(entry["màu"])
-                if entry["loại"] not in [None, "none"]:
+                if entry["loại"]:
                     values.append(entry["loại"])
                 
-                if values and not (len(values) == 1 and values[0] == "unknown"):
+                if values and not (len(values) == 1):
                     bag_parts.append(f"({', '.join(values)})")
             
             if bag_parts:
@@ -568,7 +646,29 @@ class LabelingTool:
         if not search_term:
             return
             
-        # Tìm tất cả ảnh phù hợp với từ khóa tìm kiếm
+        # Đầu tiên, thử tìm folder theo số
+        if search_term.isdigit():
+            folder_matches = [i for i, img_name in enumerate(self.image_list) 
+                         if img_name.startswith(f"{search_term} -")]
+        
+            if folder_matches:
+                # Đổi trạng thái nút lưu về ban đầu khi tìm và chuyển ảnh
+                self.save_button.config(text="Lưu nhãn", bg="#4CAF50")
+                
+                # Lưu lại label của ảnh hiện tại trước khi chuyển sang ảnh khác
+                self.save_current_labels()
+                
+                # Chọn ảnh đầu tiên trong folder có số này
+                self.image_index = folder_matches[0]
+                self.load_image()
+                
+                # Hiển thị thông báo về số lượng ảnh tìm thấy
+                if len(folder_matches) > 1:
+                    message = f"Tìm thấy {len(folder_matches)} ảnh trong folder {search_term}. Hiển thị ảnh đầu tiên."
+                    tk.messagebox.showinfo("Kết quả tìm kiếm", message)
+                return
+        
+        # Nếu không phải số hoặc không tìm thấy folder, tìm theo cách thông thường
         matching_images = [i for i, img_name in enumerate(self.image_list) 
                          if search_term in img_name.lower()]
         
@@ -599,8 +699,71 @@ class LabelingTool:
         else:  # Windows
             # Với Windows, event.delta có thể là dương hoặc âm tùy thuộc vào hướng lăn
             self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+    
+    def add_group_attributes(self, group_name):
+        """Add a complete set of attribute boxes for the specified group"""
+        # Get the attributes for this group
+        attributes = attribute_groups[group_name]
+    
+        # Create a new frame to hold the duplicated attributes horizontally
+        new_row_frame = tk.Frame(self.group_frames[group_name])
+        new_row_frame.pack(fill="x", pady=5)
+    
+        # Add each attribute in the group
+        for attr, options in attributes.items():
+            # Create a frame for this attribute
+            attr_frame = tk.Frame(new_row_frame)
+            attr_frame.pack(side="left", padx=10)
+            
+            # Label với font Roboto
+            label = tk.Label(attr_frame, text=attr + ":", font=("Roboto", 16), anchor="w")
+            label.pack(anchor="w")
+            
+            # Combobox với font Roboto
+            cb = ttk.Combobox(attr_frame, values=options, state="readonly", font=("Roboto", 16), width=15)
+            cb.set(options[0])  # Thiết lập mặc định là lựa chọn đầu tiên
+            cb.pack()
+            
+            # Add to our comboboxes dictionary
+            key = f"{group_name}:{attr}"
+            self.comboboxes.setdefault(key, []).append(cb)
 
+    def check_combobox_existence(self):
+        """Kiểm tra xem tất cả các combobox cần thiết có tồn tại không và tạo lại nếu cần"""
+        for group_name, group_fields in attribute_groups.items():
+            for attr in group_fields:
+                key = f"{group_name}:{attr}"
+                if key not in self.comboboxes or not self.comboboxes[key]:
+                    print(f"Phát hiện thiếu combobox: {key}")
+                    # Tìm frame chứa thuộc tính
+                    if group_name in self.group_frames:
+                        attr_frame = None
+                        # Tìm frame con đầu tiên (bỏ qua header)
+                        children = self.group_frames[group_name].winfo_children()
+                        if len(children) > 1:
+                            for child in children[1:]:
+                                if isinstance(child, tk.Frame):
+                                    attr_frame = child
+                                    break
+                    
+                        if attr_frame is None:
+                            # Tạo frame mới nếu không tìm thấy
+                            attr_frame = tk.Frame(self.group_frames[group_name])
+                            attr_frame.pack(fill="x", pady=5)
+                        
+                        # Tạo label và combobox mới
+                        options = group_fields[attr]
+                        label = tk.Label(attr_frame, text=attr + ":", font=("Roboto", 16), width=20, anchor="w")
+                        label.pack(side="left")
+                        
+                        cb = ttk.Combobox(attr_frame, values=options, state="readonly", font=("Roboto", 16), width=30)
+                        cb.set(options[0])
+                        cb.pack(side="left")
+                        
+                        # Cập nhật dictionary
+                        self.comboboxes[key] = [cb]
 
+# Chạy ứng dụng
 if __name__ == "__main__":
     root = tk.Tk()
     app = LabelingTool(root)
