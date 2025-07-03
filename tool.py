@@ -49,7 +49,7 @@ translation_dict = {
 
     "đồng hồ đeo tay": "wristwatch", "vòng tay": "bracelet", "vòng cổ": "necklace", "vòng chân": "anklet", 
     "ví vuông": "clutch", "ví da": "wallet", "kính": "glasses", "thẻ nhân viên": "ID card", "khăn quàng cổ": "scarf",
-    "khẩu trang": "mask", "sách": "book", "giấy": "paper"     # Khác
+    "khẩu trang": "mask", "sách": "book", "giấy": "paper", "điện thooại": "phone"     # Khác
 }
 
 # Các nhóm thuộc tính
@@ -81,15 +81,15 @@ attribute_groups = {
     },
     "Giày": {
         "Màu": ["đen", "nâu", "vàng", "trắng", "xanh", "đỏ", "xám", "xanh lá", "hồng", "tím", "không rõ"],
-        "Loại": ["giày thể thao", "dép", "tông", "giày công sở", "ủng", "giày lười", "giày cao gót"]
+        "Loại": ["không rõ", "giày thể thao", "dép", "tông", "giày công sở", "ủng", "giày lười", "giày cao gót"]
     },
     "Túi": {
         "Màu": ["đen", "nâu", "vàng", "trắng", "xanh", "đỏ", "xám", "xanh lá", "hồng", "tím", "không rõ", "không có"],
-        "Loại": ["ba lô", "túi đeo chéo", "túi xách tay", "túi đeo vai", "túi vải vuông to", "túi nilon", "cặp sách (có thể có dây đeo)"]
+        "Loại": ["không có", "ba lô", "túi đeo chéo", "túi xách tay", "túi đeo vai", "túi vải vuông to", "túi nilon", "cặp sách (có thể có dây đeo)"]
     },
     "Khác": {
         "Màu": ["không có", "đen", "nâu", "vàng", "trắng", "xanh", "đỏ", "xám", "xanh lá", "hồng", "tím"],
-        "Loại": ["không có", "đồng hồ đeo tay", "vòng tay", "vòng cổ", "vòng chân", "ví vuông", "ví da", "kính", "thẻ nhân viên", "khăn quàng cổ", "khẩu trang", "sách", "giấy"]
+        "Loại": ["không có", "khẩu trang", "điện thoại", "đồng hồ đeo tay", "vòng tay", "vòng cổ", "vòng chân", "ví vuông", "ví da", "kính", "thẻ nhân viên", "khăn quàng cổ", "sách", "giấy"]
     }
 }
 
