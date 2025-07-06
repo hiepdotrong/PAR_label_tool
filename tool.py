@@ -35,7 +35,7 @@ translation_dict = {
 
     "sọc ngang": "horizontal striped", "sọc dọc": "vertical striped", "trơn": "plain",
     "in chữ": "letter printed", "in hình": "printed", "logo": "logo", "kẻ caro": "checked",
-    "đốm": "dotted", "màu sặc sỡ": "floral", "có vùng khác màu": "colorblock", # Họa tiết áo/quần
+    "đốm": "dotted", "màu sặc sỡ": "floral", "có vùng khác màu": "color block", # Họa tiết áo/quần
 
     "quần bò": "jeans", "quần short/quần đùi": "shorts", "quần thô túi hộp": "cargo", "quần vải bó chân": "leggings",
     "quần vải chỉ qua đầu gối": "capri", "quần vải thể thao": "track pants", "quần âu": "trousers", "chân váy": "skirt",
@@ -49,7 +49,8 @@ translation_dict = {
 
     "đồng hồ đeo tay": "wristwatch", "vòng tay": "bracelet", "vòng cổ": "necklace", "vòng chân": "anklet", 
     "ví vuông": "clutch", "ví da": "wallet", "kính": "glasses", "thẻ nhân viên": "ID card", "khăn quàng cổ": "scarf",
-    "khẩu trang": "mask", "sách": "book", "giấy": "paper", "điện thoại": "phone", "ô": "umbrella", "vali": "suitcase"     # Khác
+    "khẩu trang": "mask", "sách": "book", "giấy": "paper", "điện thoại": "phone", "ô": "umbrella", "vali": "suitcase",
+    "chổi lau": "mop", "cái xô": "bucket"   # Khác
 }
 
 # Các nhóm thuộc tính
@@ -89,7 +90,7 @@ attribute_groups = {
     },
     "Khác": {
         "Màu": ["không có", "đen", "nâu", "vàng", "trắng", "xanh", "đỏ", "xám", "xanh lá", "hồng", "tím"],
-        "Loại": ["không có", "khẩu trang", "điện thoại", "ô", "vali", "đồng hồ đeo tay", "vòng tay", "vòng cổ", "vòng chân", "ví vuông", "ví da", "kính", "thẻ nhân viên", "khăn quàng cổ", "sách", "giấy"]
+        "Loại": ["không có", "khẩu trang", "điện thoại", "ô", "vali", "chổi lau", "cái xô", "đồng hồ đeo tay", "vòng tay", "vòng cổ", "vòng chân", "ví vuông", "ví da", "kính", "thẻ nhân viên", "khăn quàng cổ", "sách", "giấy"]
     }
 }
 
